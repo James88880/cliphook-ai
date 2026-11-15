@@ -25,7 +25,6 @@ if bg_base64:
 else:
     bg_css = 'url("https://unsplash.com")'
 
-# Custom GTA 6 Wallpaper & Neon Gaming CSS
 st.markdown(f"""
 <style>
 @import url('https://googleapis.com');
@@ -165,17 +164,20 @@ HOOK_TEMPLATES = {
     ]
 }
 
+def load_banner_font():
+    font_paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "arialbd.ttf"
+    ]
+    for path in font_paths:
+        if os.path.exists(path):
+            return ImageFont.truetype(path, 54)
+    return ImageFont.load_default()
+
 def create_hook_banner(hook_text, output_png):
-    """Creates a transparent 1080x1920 PNG overlay with a bold TikTok hook box at the top."""
     img = Image.new("RGBA", (1080, 1920), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 54)
-    except Exception:
-        try:
-            font = ImageFont.truetype("arialbd.ttf", 54)
-        except Exception:
-            font = ImageFont.load_default()
+    font = load_banner_font()
 
     wrapped = textwrap.fill(hook_text.upper(), width=24)
     lines = wrapped.split("\n")
@@ -190,7 +192,6 @@ def create_hook_banner(hook_text, output_png):
     img.save(output_png)
 
 def render_tiktok_mp4(input_video, hook_text, output_video):
-    """Converts horizontal 16:9 gameplay into 9:16 TikTok MP4 with blurred background + top hook banner."""
     ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
     banner_png = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
     create_hook_banner(hook_text, banner_png)
@@ -217,7 +218,6 @@ def render_tiktok_mp4(input_video, hook_text, output_video):
     if os.path.exists(banner_png):
         os.remove(banner_png)
 
-# Sidebar Control Panel (No API Key!)
 with st.sidebar:
     st.markdown("### 🎮 CLIPPER STUDIO")
     st.success("🟢 Engine Online — Ready to Render")
@@ -228,7 +228,6 @@ with st.sidebar:
     st.caption("• Auto-trims up to 60 seconds for TikTok & Shorts.")
     st.caption("• Generates instant CapCut .SRT captions.")
 
-# Hero Header
 st.markdown("""
 <div class="hero-box">
     <div class="hero-title">🌴 CLIPHOOK AI — TIKTOK STUDIO</div>
@@ -246,10 +245,7 @@ col1, col2 = st.columns([1.1, 1.3], gap="large")
 with col1:
     st.markdown("#### 🕹️ 1. UPLOAD CLIP OR PASTE LINK")
     uploaded_video = st.file_uploader("Upload Raw GTA Clip (.MP4 / .MOV):", type=["mp4", "mov", "mkv"])
-    niche = st.selectbox(
-        "Target Content Mode:",
-        list(HOOK_TEMPLATES.keys())
-    )
+    niche = st.selectbox("Target Content Mode:", list(HOOK_TEMPLATES.keys()))
     custom_hook = st.text_input(
         "Top Video Hook Text (Leave blank for auto-viral hook):",
         placeholder="e.g., HE THOUGHT HE ESCAPED A 5-STAR CHASE..."
@@ -264,6 +260,13 @@ with col1:
 def extract_video_id(url):
     match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", url)
     return match.group(1) if match else None
+
+def fetch_transcript_safe(vid_id):
+    try:
+        transcript = YouTubeTranscriptApi.get_transcript(vid_id)
+        return " ".join([item["text"] for item in transcript])
+    except Exception:
+        return None
 
 def generate_srt(script_text):
     words = script_text.split()
@@ -287,7 +290,10 @@ with col2:
             chosen_hook = custom_hook.strip() if custom_hook.strip() else random.choice(preset_hooks)
             clean_script = url_or_text.strip()
 
-            if url_or_text.strip():
-                vid_id = extract_video_id(url_or_text)
+            if clean_script:
+                vid_id = extract_video_id(clean_script)
                 if vid_id:
-                    try:
+                    fetched = fetch_transcript_safe(vid_id)
+                    if fetched:
+                        clean_script = fetched
+
