@@ -19,106 +19,23 @@ def get_base64_bg(file_path):
 bg_base64 = get_base64_bg("GTA6.jpg") or get_base64_bg("gta6.jpg") or get_base64_bg("gta6.png")
 bg_css = f'url("data:image/jpeg;base64,{bg_base64}")' if bg_base64 else 'url("https://unsplash.com")'
 
-st.markdown(f"""
-<style>
-@import url('https://googleapis.com');
-
-.stApp {{
-    background-image: linear-gradient(rgba(9, 10, 18, 0.58), rgba(14, 7, 26, 0.74)), {bg_css};
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    color: #f0f0f5;
-    font-family: 'Inter', sans-serif;
-}}
-
-#MainMenu {{visibility: hidden;}}
-footer {{visibility: hidden;}}
-header {{visibility: hidden;}}
-
-section[data-testid="stSidebar"] {{
-    background-color: rgba(10, 12, 22, 0.88) !important;
-    backdrop-filter: blur(12px);
-    border-right: 1px solid rgba(255, 0, 128, 0.35);
-}}
-
-.hero-box {{
-    background: rgba(15, 12, 28, 0.74);
-    backdrop-filter: blur(14px);
-    border: 1px solid rgba(255, 0, 128, 0.55);
-    border-radius: 16px;
-    padding: 26px 32px;
-    margin-bottom: 24px;
-    box-shadow: 0 0 30px rgba(255, 0, 128, 0.25);
-}}
-
-.hero-title {{
-    font-family: 'Orbitron', sans-serif;
-    font-size: 2.4rem;
-    font-weight: 800;
-    background: linear-gradient(90deg, #ff2a85, #ff9a00, #00f0ff);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    margin: 0;
-    letter-spacing: 1.5px;
-}}
-
-.hero-sub {{
-    color: #e2e6f5;
-    font-size: 1.05rem;
-    margin-top: 8px;
-}}
-
-.badge-row {{
-    display: flex;
-    gap: 12px;
-    margin-top: 14px;
-    flex-wrap: wrap;
-}}
-
-.badge {{
-    background: rgba(0, 240, 255, 0.16);
-    border: 1px solid rgba(0, 240, 255, 0.55);
-    color: #00f0ff;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}}
-
-div.stButton > button:first-child {{
-    background: linear-gradient(90deg, #ff007f, #ff7b00);
-    color: white;
-    font-family: 'Orbitron', sans-serif;
-    font-weight: 600;
-    letter-spacing: 1px;
-    border: none;
-    border-radius: 10px;
-    padding: 0.85rem 1.5rem;
-    width: 100%;
-    box-shadow: 0 0 22px rgba(255, 0, 128, 0.55);
-}}
-
-.stTextArea textarea, .stTextInput input, .stSelectbox div[data-baseweb="select"] {{
-    background-color: rgba(14, 16, 28, 0.88) !important;
-    border: 1px solid rgba(255, 0, 128, 0.4) !important;
-    color: #ffffff !important;
-    border-radius: 10px !important;
-}}
-
-.glass-card {{
-    background: rgba(14, 16, 28, 0.82);
-    backdrop-filter: blur(14px);
-    border: 1px solid rgba(0, 240, 255, 0.4);
-    border-radius: 14px;
-    padding: 22px;
-    margin-top: 10px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-}}
-</style>
-""", unsafe_allow_html=True)
+custom_css = (
+    "<style>"
+    "@import url('https://googleapis.com');"
+    f".stApp {{ background-image: linear-gradient(rgba(9, 10, 18, 0.58), rgba(14, 7, 26, 0.74)), {bg_css}; background-size: cover; background-position: center; background-attachment: fixed; color: #f0f0f5; font-family: 'Inter', sans-serif; }}"
+    "#MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}"
+    "section[data-testid='stSidebar'] { background-color: rgba(10, 12, 22, 0.88) !important; backdrop-filter: blur(12px); border-right: 1px solid rgba(255, 0, 128, 0.35); }"
+    ".hero-box { background: rgba(15, 12, 28, 0.74); backdrop-filter: blur(14px); border: 1px solid rgba(255, 0, 128, 0.55); border-radius: 16px; padding: 26px 32px; margin-bottom: 24px; box-shadow: 0 0 30px rgba(255, 0, 128, 0.25); }"
+    ".hero-title { font-family: 'Orbitron', sans-serif; font-size: 2.4rem; font-weight: 800; background: linear-gradient(90deg, #ff2a85, #ff9a00, #00f0ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; letter-spacing: 1.5px; }"
+    ".hero-sub { color: #e2e6f5; font-size: 1.05rem; margin-top: 8px; }"
+    ".badge-row { display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap; }"
+    ".badge { background: rgba(0, 240, 255, 0.16); border: 1px solid rgba(0, 240, 255, 0.55); color: #00f0ff; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }"
+    "div.stButton > button:first-child { background: linear-gradient(90deg, #ff007f, #ff7b00); color: white; font-family: 'Orbitron', sans-serif; font-weight: 600; letter-spacing: 1px; border: none; border-radius: 10px; padding: 0.85rem 1.5rem; width: 100%; box-shadow: 0 0 22px rgba(255, 0, 128, 0.55); }"
+    ".stTextArea textarea, .stTextInput input, .stSelectbox div[data-baseweb='select'] { background-color: rgba(14, 16, 28, 0.88) !important; border: 1px solid rgba(255, 0, 128, 0.4) !important; color: #ffffff !important; border-radius: 10px !important; }"
+    ".glass-card { background: rgba(14, 16, 28, 0.82); backdrop-filter: blur(14px); border: 1px solid rgba(0, 240, 255, 0.4); border-radius: 14px; padding: 22px; margin-top: 10px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5); }"
+    "</style>"
+)
+st.markdown(custom_css, unsafe_allow_html=True)
 
 HOOK_TEMPLATES = {
     "GTA 6 / Vice City Chaos": [
@@ -218,17 +135,17 @@ with st.sidebar:
     st.caption("• Auto-trims up to 60 seconds for TikTok & Shorts.")
     st.caption("• Generates instant CapCut .SRT captions.")
 
-st.markdown("""
-<div class="hero-box">
-    <div class="hero-title">🌴 CLIPHOOK AI — TIKTOK STUDIO</div>
-    <div class="hero-sub">Turn raw GTA 6 & FiveM clips into ready-to-post 9:16 vertical TikTok videos with viral hooks & CapCut captions.</div>
-    <div class="badge-row">
-        <span class="badge">📱 9:16 TikTok Auto-Format</span>
-        <span class="badge">🔥 Viral Hook Overlay</span>
-        <span class="badge">🎬 Ready-to-Post .MP4</span>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+hero_html = (
+    '<div class="hero-box">'
+    '<div class="hero-title">🌴 CLIPHOOK AI — TIKTOK STUDIO</div>'
+    '<div class="hero-sub">Turn raw GTA 6 & FiveM clips into ready-to-post 9:16 vertical TikTok videos with viral hooks & CapCut captions.</div>'
+    '<div class="badge-row">'
+    '<span class="badge">📱 9:16 TikTok Auto-Format</span>'
+    '<span class="badge">🔥 Viral Hook Overlay</span>'
+    '<span class="badge">🎬 Ready-to-Post .MP4</span>'
+    '</div></div>'
+)
+st.markdown(hero_html, unsafe_allow_html=True)
 
 col1, col2 = st.columns([1.1, 1.3], gap="large")
 
@@ -262,5 +179,3 @@ if generate_clicked and (uploaded_video or dialogue_text.strip()):
 with col2:
     st.markdown("#### 🏆 2. TIKTOK VIDEO & VIRAL LOOT")
     if "chosen_hook" not in st.session_state:
-        st.markdown("""
-        <div class="glass-card" style="text-align: center; padding: 60px 20px; color: #d0d7eb;">
