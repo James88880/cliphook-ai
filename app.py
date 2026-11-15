@@ -165,7 +165,7 @@ HOOK_TEMPLATES = {
 def load_banner_font():
     for path in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "arialbd.ttf"]:
         if os.path.exists(path):
-            return ImageFont.truetype(path, 38)
+            return ImageFont.truetype(path, 36)
     return ImageFont.load_default()
 
 def create_hook_banner(hook_text, output_png):
@@ -179,8 +179,7 @@ def create_hook_banner(hook_text, output_png):
     draw.rectangle([45, 140, 675, 140 + box_height], fill=(255, 255, 255, 245))
     y_text = 160
     for line in lines:
-        bbox = draw.textbbox((0, 0), line, font=font)
-        text_width = bbox - bbox
+        text_width = draw.textlength(line, font=font)
         draw.text(((720 - text_width) / 2, y_text), line, font=font, fill=(10, 10, 15, 255))
         y_text += 48
     img.save(output_png)
@@ -190,7 +189,6 @@ def render_tiktok_mp4(input_video, hook_text, output_video):
     banner_png = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
     create_hook_banner(hook_text, banner_png)
 
-    # Fast 720x1280 vertical TikTok render (low memory, super fast)
     filter_complex = (
         "[0:v]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,boxblur=15:3[bg];"
         "[0:v]scale=720:-2[fg];"
@@ -266,23 +264,24 @@ with col1:
     )
     generate_clicked = st.button("🚀 CREATE TIKTOK VIDEO & HOOKS")
 
-with col2:
-    st.markdown("#### 🏆 2. TIKTOK VIDEO & VIRAL LOOT")
-    if generate_clicked:
-        if not uploaded_video and not dialogue_text.strip():
-            st.warning("⚠️ Please upload a raw `.MP4` video clip on the left first!")
-        else:
-            preset_hooks = HOOK_TEMPLATES[niche]
-            chosen_hook = custom_hook.strip() if custom_hook.strip() else random.choice(preset_hooks)
-            clean_script = dialogue_text.strip()
+if generate_clicked:
+    if not uploaded_video and not dialogue_text.strip():
+        st.warning("⚠️ Please upload a raw `.MP4` video clip on the left first!")
+    else:
+        preset_hooks = HOOK_TEMPLATES[niche]
+        chosen_hook = custom_hook.strip() if custom_hook.strip() else random.choice(preset_hooks)
+        st.session_state["preset_hooks"] = preset_hooks
+        st.session_state["chosen_hook"] = chosen_hook
+        st.session_state["niche"] = niche
+        st.session_state["clean_script"] = dialogue_text.strip()
+        st.session_state["video_bytes"] = None
 
-            tab1, tab2, tab3 = st.tabs(["📱 TikTok Video (.MP4)", "🔥 Viral Hook Ideas", "🎬 CapCut .SRT"])
+        if uploaded_video:
+            with st.spinner("🎬 Rendering 9:16 vertical TikTok video (takes ~5-10 seconds)..."):
+                in_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+                in_tmp.write(uploaded_video.getvalue())
+                in_tmp.close()
+                out_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
 
-            with tab1:
-                if uploaded_video:
-                    with st.spinner("🎬 Rendering 9:16 vertical TikTok video (takes ~5-10 seconds)..."):
-                        in_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-                        in_tmp.write(uploaded_video.getvalue())
-                        in_tmp.close()
-                        out_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
-
+                try:
+                    render_tiktok_mp4(in_tmp.name, chosen_hook, out_tmp)
