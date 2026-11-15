@@ -1,5 +1,4 @@
 import streamlit as st
-from openai import OpenAI
 from youtube_transcript_api import YouTubeTranscriptApi
 import re
 import base64
@@ -9,6 +8,7 @@ import tempfile
 import imageio_ffmpeg
 from PIL import Image, ImageDraw, ImageFont
 import textwrap
+import random
 
 st.set_page_config(page_title="ClipHook AI | TikTok GTA Video Engine", page_icon="🎮", layout="wide")
 
@@ -134,26 +134,59 @@ div.stButton > button:first-child:hover {{
 </style>
 """, unsafe_allow_html=True)
 
+HOOK_TEMPLATES = {
+    "GTA 6 / Vice City Chaos": [
+        "HE THOUGHT HE ESCAPED A 5-STAR CHASE...",
+        "NOBODY EXPECTED THIS ENDING IN VICE CITY...",
+        "99% OF PLAYERS FAIL THIS GTA JUMP...",
+        "WAIT UNTIL THE COPS SEE WHAT HE DID...",
+        "THIS GTA 6 PHYSICS MOMENT BROKE THE LOBBY..."
+    ],
+    "GTA Roleplay / FiveM": [
+        "THE ADMIN WAS WATCHING THE WHOLE TIME...",
+        "HE ROBBED THE WRONG GANG IN FIVEM...",
+        "THIS RP PLOT TWIST HAD THE WHOLE SERVER CRYING...",
+        "BRO REALLY THOUGHT HE COULD OUTSMART THE LSPD...",
+        "INSTANT KARMA IN GTA RP..."
+    ],
+    "Faceless Gaming Story": [
+        "THE RAREST MOMENT EVER CAUGHT ON STREAM...",
+        "HOW DID HE ACTUALLY SURVIVE THIS...",
+        "WATCH CLOSELY AT THE 10-SECOND MARK...",
+        "THIS ONE MISTAKE COST HIM EVERYTHING...",
+        "ONLY TRUE GAMERS WILL UNDERSTAND THIS..."
+    ],
+    "Streamer Rage / Podcast Clip": [
+        "HE INSTANTLY REGRETTED SAYING THAT LIVE...",
+        "CHAT LOST THEIR MINDS WHEN THIS HAPPENED...",
+        "HIS REACTION AT THE END IS PRICELESS...",
+        "BRO ALMOST BROKE HIS SETUP OVER THIS...",
+        "THE FUNNIEST STREAM MOMENT THIS WEEK..."
+    ]
+}
+
 def create_hook_banner(hook_text, output_png):
     """Creates a transparent 1080x1920 PNG overlay with a bold TikTok hook box at the top."""
     img = Image.new("RGBA", (1080, 1920), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     try:
-        font = ImageFont.truetype("arialbd.ttf", 58)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 54)
     except Exception:
-        font = ImageFont.load_default()
+        try:
+            font = ImageFont.truetype("arialbd.ttf", 54)
+        except Exception:
+            font = ImageFont.load_default()
 
     wrapped = textwrap.fill(hook_text.upper(), width=24)
     lines = wrapped.split("\n")
-    box_height = 80 + len(lines) * 72
-    # Draw white rounded-style banner box near the top (safe from TikTok UI)
+    box_height = 70 + len(lines) * 68
     draw.rectangle([70, 220, 1010, 220 + box_height], fill=(255, 255, 255, 245))
-    y_text = 250
+    y_text = 248
     for line in lines:
         bbox = draw.textbbox((0, 0), line, font=font)
         w = bbox[2] - bbox[0]
         draw.text(((1080 - w) / 2, y_text), line, font=font, fill=(10, 10, 15, 255))
-        y_text += 72
+        y_text += 68
     img.save(output_png)
 
 def render_tiktok_mp4(input_video, hook_text, output_video):
@@ -162,7 +195,6 @@ def render_tiktok_mp4(input_video, hook_text, output_video):
     banner_png = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
     create_hook_banner(hook_text, banner_png)
 
-    # Filter: Blurred 9:16 background + sharp centered 16:9 gameplay + top viral hook banner
     filter_complex = (
         "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=25:5[bg];"
         "[0:v]scale=1080:-2[fg];"
@@ -185,15 +217,16 @@ def render_tiktok_mp4(input_video, hook_text, output_video):
     if os.path.exists(banner_png):
         os.remove(banner_png)
 
-# Sidebar Control Panel
+# Sidebar Control Panel (No API Key!)
 with st.sidebar:
-    st.markdown("### ⚙️ MISSION CONTROL")
-    api_key = st.text_input("OpenAI API Key (Optional for Video)", type="password", placeholder="sk-...")
+    st.markdown("### 🎮 CLIPPER STUDIO")
+    st.success("🟢 Engine Online — Ready to Render")
     st.markdown("---")
     st.markdown("**📱 TikTok Auto-Editor Specs:**")
     st.caption("• Outputs 1080x1920 (9:16) vertical MP4.")
-    st.caption("• Adds blurred background fill + top viral hook banner.")
-    st.caption("• Auto-trims up to 60 seconds for TikTok & Reels.")
+    st.caption("• Blurred gameplay fill + viral hook banner.")
+    st.caption("• Auto-trims up to 60 seconds for TikTok & Shorts.")
+    st.caption("• Generates instant CapCut .SRT captions.")
 
 # Hero Header
 st.markdown("""
@@ -213,18 +246,18 @@ col1, col2 = st.columns([1.1, 1.3], gap="large")
 with col1:
     st.markdown("#### 🕹️ 1. UPLOAD CLIP OR PASTE LINK")
     uploaded_video = st.file_uploader("Upload Raw GTA Clip (.MP4 / .MOV):", type=["mp4", "mov", "mkv"])
-    custom_hook = st.text_input(
-        "Top Video Hook Text (Leave blank for AI auto-hook):",
-        placeholder="e.g., HE THOUGHT HE ESCAPED A 5-STAR CHASE..."
-    )
     niche = st.selectbox(
         "Target Content Mode:",
-        ["GTA 6 / Vice City Chaos", "GTA Roleplay / FiveM", "Faceless Gaming Story", "Streamer Rage / Podcast Clip"]
+        list(HOOK_TEMPLATES.keys())
+    )
+    custom_hook = st.text_input(
+        "Top Video Hook Text (Leave blank for auto-viral hook):",
+        placeholder="e.g., HE THOUGHT HE ESCAPED A 5-STAR CHASE..."
     )
     url_or_text = st.text_area(
-        "YouTube URL or Clip Description (for AI Hooks & Captions):",
-        height=120,
-        placeholder="Describe what happens in the clip OR paste a YouTube link..."
+        "YouTube URL or Clip Dialogue (Optional for .SRT Captions):",
+        height=110,
+        placeholder="Paste spoken dialogue or a YouTube link to generate CapCut .SRT captions..."
     )
     generate_clicked = st.button("🚀 CREATE TIKTOK VIDEO & HOOKS")
 
@@ -248,32 +281,13 @@ with col2:
     st.markdown("#### 🏆 2. TIKTOK VIDEO & VIRAL LOOT")
     if generate_clicked:
         if not uploaded_video and not url_or_text.strip():
-            st.warning("⚠️ Upload a raw GTA video (.MP4) OR paste a YouTube link/description first.")
+            st.warning("⚠️ Upload a raw GTA video (.MP4) OR paste dialogue/YouTube link first.")
         else:
-            hooks_and_titles = ""
+            preset_hooks = HOOK_TEMPLATES[niche]
+            chosen_hook = custom_hook.strip() if custom_hook.strip() else random.choice(preset_hooks)
             clean_script = url_or_text.strip()
-            chosen_hook = custom_hook.strip() if custom_hook.strip() else "WAIT UNTIL THE END OF THIS GTA CHASE..."
 
-            # Run AI Hook & Script Engine if API key is provided
-            if api_key and url_or_text.strip():
-                with st.spinner("🧠 Generating viral hooks & script..."):
-                    transcript_text = url_or_text
-                    vid_id = extract_video_id(url_or_text)
-                    if vid_id:
-                        try:
-                            transcript = YouTubeTranscriptApi.get_transcript(vid_id)
-                            transcript_text = " ".join([item["text"] for item in transcript])
-                        except Exception:
-                            pass
-
-                    client = OpenAI(api_key=api_key)
-                    prompt = f"""
-                    You are an elite TikTok gaming editor for {niche}.
-                    Return ONLY three sections separated by '===SPLIT===':
-                    Section 1: ONE single punchy 6-word viral hook headline in ALL CAPS for the top of the video.
-                    ===SPLIT===
-                    Section 2: 5 viral hook variations and 3 TikTok titles with hashtags.
-                    ===SPLIT===
-                    Section 3: A clean, copyright-safe 30-second voiceover script.
-                    Context: {transcript_text[:3500]}
-                    """
+            if url_or_text.strip():
+                vid_id = extract_video_id(url_or_text)
+                if vid_id:
+                    try:
