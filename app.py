@@ -17,19 +17,14 @@ def get_base64_bg(file_path):
     return None
 
 bg_base64 = get_base64_bg("GTA6.jpg") or get_base64_bg("gta6.jpg") or get_base64_bg("gta6.png")
-
-if bg_base64:
-    bg_css = f'url("data:image/jpeg;base64,{bg_base64}")'
-else:
-    bg_css = 'url("https://unsplash.com")'
+bg_css = f'url("data:image/jpeg;base64,{bg_base64}")' if bg_base64 else 'url("https://unsplash.com")'
 
 st.markdown(f"""
 <style>
 @import url('https://googleapis.com');
 
 .stApp {{
-    background-image: linear-gradient(rgba(9, 10, 18, 0.58), rgba(14, 7, 26, 0.74)),
-                      {bg_css};
+    background-image: linear-gradient(rgba(9, 10, 18, 0.58), rgba(14, 7, 26, 0.74)), {bg_css};
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
@@ -104,12 +99,6 @@ div.stButton > button:first-child {{
     padding: 0.85rem 1.5rem;
     width: 100%;
     box-shadow: 0 0 22px rgba(255, 0, 128, 0.55);
-    transition: all 0.2s ease-in-out;
-}}
-
-div.stButton > button:first-child:hover {{
-    transform: translateY(-2px);
-    box-shadow: 0 0 32px rgba(0, 240, 255, 0.8);
 }}
 
 .stTextArea textarea, .stTextInput input, .stSelectbox div[data-baseweb="select"] {{
@@ -163,16 +152,14 @@ HOOK_TEMPLATES = {
 }
 
 def load_banner_font():
-    for path in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "arialbd.ttf"]:
-        if os.path.exists(path):
-            return ImageFont.truetype(path, 36)
+    if os.path.exists("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"):
+        return ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
     return ImageFont.load_default()
 
 def create_hook_banner(hook_text, output_png):
     img = Image.new("RGBA", (720, 1280), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     font = load_banner_font()
-
     wrapped = textwrap.fill(hook_text.upper(), width=24)
     lines = wrapped.split("\n")
     box_height = 46 + len(lines) * 48
@@ -184,33 +171,30 @@ def create_hook_banner(hook_text, output_png):
         y_text += 48
     img.save(output_png)
 
-def render_tiktok_mp4(input_video, hook_text, output_video):
-    ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+def process_video_upload(uploaded_file, hook_text):
+    in_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+    in_tmp.write(uploaded_file.getvalue())
+    in_tmp.close()
+
+    out_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
     banner_png = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
     create_hook_banner(hook_text, banner_png)
 
-    filter_complex = (
-        "[0:v]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,boxblur=15:3[bg];"
-        "[0:v]scale=720:-2[fg];"
-        "[bg][fg]overlay=(W-w)/2:(H-h)/2[vid];"
-        "[vid][1:v]overlay=0:0[out]"
-    )
-    cmd = [
-        ffmpeg_exe, "-y",
-        "-i", input_video,
-        "-i", banner_png,
-        "-filter_complex", filter_complex,
-        "-map", "[out]",
-        "-map", "0:a?",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "24",
-        "-c:a", "aac", "-b:a", "128k",
-        "-t", "60",
-        output_video
-    ]
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    if os.path.exists(banner_png):
-        os.remove(banner_png)
-    return result.returncode, result.stderr.decode("utf-8", errors="ignore")
+    ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+    filter_complex = "[0:v]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,boxblur=15:3[bg];[0:v]scale=720:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2[vid];[vid][1:v]overlay=0:0[out]"
+    cmd = [ffmpeg_exe, "-y", "-i", in_tmp.name, "-i", banner_png, "-filter_complex", filter_complex, "-map", "[out]", "-map", "0:a?", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "24", "-c:a", "aac", "-b:a", "128k", "-t", "60", out_tmp]
+    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    video_data = None
+    if res.returncode == 0 and os.path.exists(out_tmp):
+        with open(out_tmp, "rb") as f:
+            video_data = f.read()
+
+    for p in [in_tmp.name, out_tmp, banner_png]:
+        if os.path.exists(p):
+            os.remove(p)
+
+    return video_data, res.stderr.decode("utf-8", errors="ignore")
 
 def generate_srt(script_text):
     words = script_text.split()
@@ -252,35 +236,31 @@ with col1:
     st.markdown("#### 🕹️ 1. UPLOAD CLIP & CUSTOMIZE")
     uploaded_video = st.file_uploader("Upload Raw GTA Clip (.MP4 / .MOV):", type=["mp4", "mov", "mkv"])
     niche = st.selectbox("Target Content Mode:", list(HOOK_TEMPLATES.keys()))
-    custom_hook = st.text_input(
-        "Top Video Hook Text (Leave blank for auto-viral hook):",
-        placeholder="e.g., HE THOUGHT HE ESCAPED A 5-STAR CHASE..."
-    )
-    dialogue_text = st.text_area(
-        "Clip Dialogue (Optional for CapCut .SRT Captions):",
-        height=90,
-        placeholder="Paste spoken words here if you also want a downloadable .SRT caption file..."
-    )
+    custom_hook = st.text_input("Top Video Hook Text (Leave blank for auto-viral hook):", placeholder="e.g., HE THOUGHT HE ESCAPED A 5-STAR CHASE...")
+    dialogue_text = st.text_area("Clip Dialogue (Optional for CapCut .SRT Captions):", height=90, placeholder="Paste spoken words here if you also want a downloadable .SRT caption file...")
     generate_clicked = st.button("🚀 CREATE TIKTOK VIDEO & HOOKS")
 
-if generate_clicked:
-    if not uploaded_video and not dialogue_text.strip():
-        st.warning("⚠️ Please upload a raw `.MP4` video clip on the left first!")
-    else:
-        preset_hooks = HOOK_TEMPLATES[niche]
-        chosen_hook = custom_hook.strip() if custom_hook.strip() else random.choice(preset_hooks)
-        st.session_state["preset_hooks"] = preset_hooks
-        st.session_state["chosen_hook"] = chosen_hook
-        st.session_state["niche"] = niche
-        st.session_state["clean_script"] = dialogue_text.strip()
-        st.session_state["video_bytes"] = None
+if generate_clicked and not uploaded_video and not dialogue_text.strip():
+    st.warning("⚠️ Please upload a raw `.MP4` video clip on the left first!")
 
-        if uploaded_video:
-            with st.spinner("🎬 Rendering 9:16 vertical TikTok video (takes ~5-10 seconds)..."):
-                in_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-                in_tmp.write(uploaded_video.getvalue())
-                in_tmp.close()
-                out_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
+if generate_clicked and (uploaded_video or dialogue_text.strip()):
+    preset_hooks = HOOK_TEMPLATES[niche]
+    chosen_hook = custom_hook.strip() if custom_hook.strip() else random.choice(preset_hooks)
+    st.session_state["preset_hooks"] = preset_hooks
+    st.session_state["chosen_hook"] = chosen_hook
+    st.session_state["niche"] = niche
+    st.session_state["clean_script"] = dialogue_text.strip()
+    st.session_state["video_bytes"] = None
 
-                code, err = render_tiktok_mp4(in_tmp.name, chosen_hook, out_tmp)
-                if code == 0 and os.path.exists(out_tmp):
+    if uploaded_video:
+        with st.spinner("🎬 Rendering 9:16 vertical TikTok video..."):
+            vid_bytes, err_msg = process_video_upload(uploaded_video, chosen_hook)
+            st.session_state["video_bytes"] = vid_bytes
+            if not vid_bytes:
+                st.error(f"FFmpeg error: {err_msg[-300:]}")
+
+with col2:
+    st.markdown("#### 🏆 2. TIKTOK VIDEO & VIRAL LOOT")
+    if "chosen_hook" not in st.session_state:
+        st.markdown("""
+        <div class="glass-card" style="text-align: center; padding: 60px 20px; color: #d0d7eb;">
