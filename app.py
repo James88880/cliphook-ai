@@ -1,6 +1,4 @@
 import streamlit as st
-from youtube_transcript_api import YouTubeTranscriptApi
-import re
 import base64
 import os
 import subprocess
@@ -165,30 +163,26 @@ HOOK_TEMPLATES = {
 }
 
 def load_banner_font():
-    font_paths = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "arialbd.ttf"
-    ]
-    for path in font_paths:
+    for path in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "arialbd.ttf"]:
         if os.path.exists(path):
-            return ImageFont.truetype(path, 54)
+            return ImageFont.truetype(path, 38)
     return ImageFont.load_default()
 
 def create_hook_banner(hook_text, output_png):
-    img = Image.new("RGBA", (1080, 1920), (0, 0, 0, 0))
+    img = Image.new("RGBA", (720, 1280), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     font = load_banner_font()
 
     wrapped = textwrap.fill(hook_text.upper(), width=24)
     lines = wrapped.split("\n")
-    box_height = 70 + len(lines) * 68
-    draw.rectangle([70, 220, 1010, 220 + box_height], fill=(255, 255, 255, 245))
-    y_text = 248
+    box_height = 46 + len(lines) * 48
+    draw.rectangle([45, 140, 675, 140 + box_height], fill=(255, 255, 255, 245))
+    y_text = 160
     for line in lines:
         bbox = draw.textbbox((0, 0), line, font=font)
-        w = bbox[2] - bbox[0]
-        draw.text(((1080 - w) / 2, y_text), line, font=font, fill=(10, 10, 15, 255))
-        y_text += 68
+        text_width = bbox - bbox
+        draw.text(((720 - text_width) / 2, y_text), line, font=font, fill=(10, 10, 15, 255))
+        y_text += 48
     img.save(output_png)
 
 def render_tiktok_mp4(input_video, hook_text, output_video):
@@ -196,9 +190,10 @@ def render_tiktok_mp4(input_video, hook_text, output_video):
     banner_png = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
     create_hook_banner(hook_text, banner_png)
 
+    # Fast 720x1280 vertical TikTok render (low memory, super fast)
     filter_complex = (
-        "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=25:5[bg];"
-        "[0:v]scale=1080:-2[fg];"
+        "[0:v]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,boxblur=15:3[bg];"
+        "[0:v]scale=720:-2[fg];"
         "[bg][fg]overlay=(W-w)/2:(H-h)/2[vid];"
         "[vid][1:v]overlay=0:0[out]"
     )
@@ -209,21 +204,35 @@ def render_tiktok_mp4(input_video, hook_text, output_video):
         "-filter_complex", filter_complex,
         "-map", "[out]",
         "-map", "0:a?",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "24",
         "-c:a", "aac", "-b:a", "128k",
         "-t", "60",
         output_video
     ]
-    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if os.path.exists(banner_png):
         os.remove(banner_png)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.decode("utf-8", errors="ignore")[-400:])
+
+def generate_srt(script_text):
+    words = script_text.split()
+    chunks = [" ".join(words[i:i+5]) for i in range(0, len(words), 5)]
+    srt_lines = []
+    for idx, chunk in enumerate(chunks, start=1):
+        start_sec = (idx - 1) * 2
+        end_sec = idx * 2
+        start_time = f"00:{start_sec//60:02d}:{start_sec%60:02d},000"
+        end_time = f"00:{end_sec//60:02d}:{end_sec%60:02d},000"
+        srt_lines.append(f"{idx}\n{start_time} --> {end_time}\n{chunk}\n")
+    return "\n".join(srt_lines)
 
 with st.sidebar:
     st.markdown("### 🎮 CLIPPER STUDIO")
     st.success("🟢 Engine Online — Ready to Render")
     st.markdown("---")
     st.markdown("**📱 TikTok Auto-Editor Specs:**")
-    st.caption("• Outputs 1080x1920 (9:16) vertical MP4.")
+    st.caption("• Outputs 9:16 vertical TikTok MP4.")
     st.caption("• Blurred gameplay fill + viral hook banner.")
     st.caption("• Auto-trims up to 60 seconds for TikTok & Shorts.")
     st.caption("• Generates instant CapCut .SRT captions.")
@@ -243,57 +252,37 @@ st.markdown("""
 col1, col2 = st.columns([1.1, 1.3], gap="large")
 
 with col1:
-    st.markdown("#### 🕹️ 1. UPLOAD CLIP OR PASTE LINK")
+    st.markdown("#### 🕹️ 1. UPLOAD CLIP & CUSTOMIZE")
     uploaded_video = st.file_uploader("Upload Raw GTA Clip (.MP4 / .MOV):", type=["mp4", "mov", "mkv"])
     niche = st.selectbox("Target Content Mode:", list(HOOK_TEMPLATES.keys()))
     custom_hook = st.text_input(
         "Top Video Hook Text (Leave blank for auto-viral hook):",
         placeholder="e.g., HE THOUGHT HE ESCAPED A 5-STAR CHASE..."
     )
-    url_or_text = st.text_area(
-        "YouTube URL or Clip Dialogue (Optional for .SRT Captions):",
-        height=110,
-        placeholder="Paste spoken dialogue or a YouTube link to generate CapCut .SRT captions..."
+    dialogue_text = st.text_area(
+        "Clip Dialogue (Optional for CapCut .SRT Captions):",
+        height=90,
+        placeholder="Paste spoken words here if you also want a downloadable .SRT caption file..."
     )
     generate_clicked = st.button("🚀 CREATE TIKTOK VIDEO & HOOKS")
-
-def extract_video_id(url):
-    match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", url)
-    return match.group(1) if match else None
-
-def fetch_transcript_safe(vid_id):
-    try:
-        transcript = YouTubeTranscriptApi.get_transcript(vid_id)
-        return " ".join([item["text"] for item in transcript])
-    except Exception:
-        return None
-
-def generate_srt(script_text):
-    words = script_text.split()
-    chunks = [" ".join(words[i:i+5]) for i in range(0, len(words), 5)]
-    srt_lines = []
-    for idx, chunk in enumerate(chunks, start=1):
-        start_sec = (idx - 1) * 2
-        end_sec = idx * 2
-        start_time = f"00:{start_sec//60:02d}:{start_sec%60:02d},000"
-        end_time = f"00:{end_sec//60:02d}:{end_sec%60:02d},000"
-        srt_lines.append(f"{idx}\n{start_time} --> {end_time}\n{chunk}\n")
-    return "\n".join(srt_lines)
 
 with col2:
     st.markdown("#### 🏆 2. TIKTOK VIDEO & VIRAL LOOT")
     if generate_clicked:
-        if not uploaded_video and not url_or_text.strip():
-            st.warning("⚠️ Upload a raw GTA video (.MP4) OR paste dialogue/YouTube link first.")
+        if not uploaded_video and not dialogue_text.strip():
+            st.warning("⚠️ Please upload a raw `.MP4` video clip on the left first!")
         else:
             preset_hooks = HOOK_TEMPLATES[niche]
             chosen_hook = custom_hook.strip() if custom_hook.strip() else random.choice(preset_hooks)
-            clean_script = url_or_text.strip()
+            clean_script = dialogue_text.strip()
 
-            if clean_script:
-                vid_id = extract_video_id(clean_script)
-                if vid_id:
-                    fetched = fetch_transcript_safe(vid_id)
-                    if fetched:
-                        clean_script = fetched
+            tab1, tab2, tab3 = st.tabs(["📱 TikTok Video (.MP4)", "🔥 Viral Hook Ideas", "🎬 CapCut .SRT"])
+
+            with tab1:
+                if uploaded_video:
+                    with st.spinner("🎬 Rendering 9:16 vertical TikTok video (takes ~5-10 seconds)..."):
+                        in_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+                        in_tmp.write(uploaded_video.getvalue())
+                        in_tmp.close()
+                        out_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
 
