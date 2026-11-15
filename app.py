@@ -210,8 +210,7 @@ def render_tiktok_mp4(input_video, hook_text, output_video):
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if os.path.exists(banner_png):
         os.remove(banner_png)
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.decode("utf-8", errors="ignore")[-400:])
+    return result.returncode, result.stderr.decode("utf-8", errors="ignore")
 
 def generate_srt(script_text):
     words = script_text.split()
@@ -283,5 +282,5 @@ if generate_clicked:
                 in_tmp.close()
                 out_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
 
-                try:
-                    render_tiktok_mp4(in_tmp.name, chosen_hook, out_tmp)
+                code, err = render_tiktok_mp4(in_tmp.name, chosen_hook, out_tmp)
+                if code == 0 and os.path.exists(out_tmp):
